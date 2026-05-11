@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wachusett Reservoir Explorer</title>
+
+  <link href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css" rel="stylesheet"/>
+  <script src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script>
+  <!-- DM Sans (UI) + DM Mono (data values) -->
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+
+  <style>
+    /* ── Reset ────────────────────────────────────────────────────────────── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* ── CSS variables — edit here to retheme without touching layout ──────── */
+    :root {
+      --font-sans:    'DM Sans', sans-serif;
+      --font-mono:    'DM Mono', monospace;
+      --bg-panel:     rgba(252, 251, 248, 0.94);
+      --border:       #d8d4cc;
+      --text:         #1a1f2e;
+      --text-muted:   #6b7280;
+      --accent:       #1a4f7a;     /* deep reservoir blue */
+      --gate-green:   #1e6b3a;
+      --shadow:       0 2px 16px rgba(0, 0, 0, 0.13);
+    }
+
+    body  { font-family: var(--font-sans); }
+    #map  { position: fixed; inset: 0; }
+
+    /* ── Panel base ───────────────────────────────────────────────────────── */
+    .panel {
+      position: absolute;
+      z-index: 10;
+      background: var(--bg-panel);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      box-shadow: var(--shadow);
+    }
+    .panel-heading {
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    /* ── Left sidebar — flex column auto-stacks title, gate search, gauges ── */
+    #sidebar {
+      position: absolute;
+      top: 20px; left: 20px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 270px;
+    }
+    /* Sidebar children sit in the flow; override the base .panel absolute rule */
+    #sidebar .panel { position: relative; }
+
+    /* ── Title panel ──────────────────────────────────────────────────────── */
+    #panel-title { border-left: 3px solid var(--accent); }
+    .map-title    { font-size: 1.05rem; font-weight: 600; color: var(--text); letter-spacing: -0.02em; }
+    .map-subtitle { font-size: 0.78rem; color: var(--text-muted); margin-top: 3px; }
+    .map-credit   {
+      font-size: 0.68rem; color: var(--text-muted);
+      margin-top: 10px;
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+      line-height: 1.5;
+    }
+
+    /* ── Layer toggle panel (top-right) ───────────────────────────────────── */
+    #panel-layers { top: 20px; right: 20px; min-width: 205px; }
+
+    .layer-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 5px 0;
+    }
+    .layer-swatch {
+      width: 16px; height: 16px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .layer-row label:not(.toggle) {
+      font-size: 0.82rem;
+      color: var(--text);
+      cursor: pointer;
+      flex: 1;
+      user-select: none;
+    }
+
+    /* CSS-only toggle switch */
+    .toggle { position: relative; width: 34px; height: 20px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-track {
+      position: absolute; inset: 0;
+      background: #d1d5db;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      left: 3px; top: 3px;
+      width: 14px; height: 14px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .toggle input:checked + .toggle-track { background: var(--accent); }
+    .toggle input:checked + .toggle-track::after { transform: translateX(14px); }
+
+    /* ── Gate search panel ────────────────────────────────────────────────── */
+    #panel-gate-search { border-left: 3px solid var(--gate-green); }
+    .search-input-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    #gate-search-input {
+      flex: 1;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: white;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    #gate-search-input:focus { border-color: var(--gate-green); }
+    #gate-search-btn {
+      padding: 6px 10px;
+      background: var(--gate-green);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    #gate-search-btn:hover { opacity: 0.85; }
+    #gate-select {
+      width: 100%;
+      margin-top: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: white;
+      color: var(--text);
+      cursor: pointer;
+      outline: none;
+    }
+    #gate-select:focus { border-color: var(--gate-green); }
+    #gate-search-msg {
+      margin-top: 8px;
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      min-height: 1.1em;
+    }
+    .gate-hint {
+      margin-top: 8px;
+      font-size: 0.71rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+    }
+
+    /* ── Bathymetry legend (bottom-left) ──────────────────────────────────── */
+    #panel-legend { bottom: 40px; left: 20px; min-width: 175px; }
+    .legend-ramp {
+      height: 10px; border-radius: 3px;
+      background: linear-gradient(to right, #deeef8, #4292c6, #08306b);
+      margin: 6px 0 3px;
+    }
+    .legend-ends {
+      display: flex; justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    /* ── USGS live gauge panel ────────────────────────────────────────────── */
+    #panel-gauges { }
+    .gauge-name { word-break: break-word; }
+    .gauge-site {
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .gauge-site:last-child { border-bottom: none; padding-bottom: 0; }
+    .gauge-name  { font-size: 0.8rem; font-weight: 500; color: var(--text); line-height: 1.3; }
+    .gauge-value { font-family: var(--font-mono); font-size: 0.78rem; color: var(--accent); margin-top: 3px; }
+    .gauge-time  { font-size: 0.67rem; color: var(--text-muted); margin-top: 2px; }
+    .gauge-msg   { font-size: 0.78rem; color: var(--text-muted); font-style: italic; }
+
+    /* ── Gate popup (MapLibre popup override) ────────────────────────────── */
+    .gate-popup-content { font-family: var(--font-sans); min-width: 190px; }
+    .gate-popup-title   { font-size: 0.95rem; font-weight: 600; color: var(--gate-green); margin-bottom: 6px; }
+    .gate-popup-town    { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 8px; }
+    .gate-popup-badges  { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+    .gate-badge {
+      font-size: 0.68rem; padding: 2px 6px;
+      border-radius: 10px; white-space: nowrap;
+    }
+    .gate-badge.allow  { background: #d1fae5; color: #065f46; }
+    .gate-badge.deny   { background: #fee2e2; color: #991b1b; }
+    .gate-badge.info   { background: #e0f2fe; color: #0369a1; }
+    .gate-popup-detail { font-size: 0.75rem; color: var(--text-muted); line-height: 1.7; }
+
+    /* ── Historical photo modal ───────────────────────────────────────────── */
+    #photo-modal {
+      display: none;
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(10, 15, 28, 0.65);
+      backdrop-filter: blur(4px);
+      align-items: center;
+      justify-content: center;
+    }
+    #photo-modal.open { display: flex; }
+    .modal-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 460px;
+      width: calc(100vw - 40px);
+      box-shadow: 0 8px 40px rgba(0,0,0,0.28);
+    }
+    .modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+    .modal-title  { font-size: 0.9rem; font-weight: 500; color: var(--text); line-height: 1.4; flex: 1; padding-right: 12px; }
+    .modal-close  {
+      background: none; border: none;
+      font-size: 1.1rem; cursor: pointer;
+      color: var(--text-muted); line-height: 1;
+      flex-shrink: 0;
+    }
+    .modal-close:hover { color: var(--text); }
+    .modal-img {
+      width: 100%; border-radius: 6px;
+      display: block; margin-bottom: 12px;
+      background: #e5e7eb;
+      min-height: 60px;
+    }
+    .modal-date { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
+    .modal-desc { font-size: 0.78rem; color: var(--text-muted); margin-top: 6px; line-height: 1.5; }
+    .modal-link {
+      display: inline-block; margin-top: 12px;
+      font-size: 0.78rem; color: var(--accent);
+      text-decoration: none;
+    }
+    .modal-link:hover { text-decoration: underline; }
+
+    /* ── Loading overlay ─────────────────────────────────────────────────── */
+    #loading {
+      position: fixed; inset: 0; z-index: 200;
+      background: #f5f4f0;
+      display: flex; align-items: center; justify-content: center;
+      transition: opacity 0.4s;
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid #d8d4cc;
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-size: 0.8rem; color: var(--text-muted); text-align: center; }
+
+    /* ── Responsive ──────────────────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      #sidebar      { top: auto; bottom: 120px; left: 10px; right: 10px; width: auto; }
+      #panel-gauges { display: none; }
+      #panel-layers { top: auto; bottom: 10px; right: 10px; left: 10px; min-width: 0; }
+      #panel-legend { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Loading overlay (removed once all data resolves) -->
+<div id="loading">
+  <div>
+    <div class="spinner"></div>
+    <p class="loading-text">Loading Wachusett Reservoir...</p>
+  </div>
+</div>
+
+<div id="map"></div>
+
+<!-- Layer toggles (right side — outside sidebar) -->
+<div class="panel" id="panel-layers">
+  <p class="panel-heading">Layers</p>
+
+  <div class="layer-row">
+    <span class="layer-swatch" style="background:#c6e3f4; border:2px solid #1a4f7a;"></span>
+    <label for="tog-watershed">Watershed</label>
+    <label class="toggle">
+      <input type="checkbox" id="tog-watershed" checked/>
+      <span class="toggle-track"></span>
+    </label>
+  </div>
+
+  <div class="layer-row">
+    <span class="layer-swatch" style="background:linear-gradient(135deg,#deeef8,#08306b);"></span>
+    <label for="tog-bathymetry">Bathymetry</label>
+    <label class="toggle">
+      <input type="checkbox" id="tog-bathymetry" checked/>
+      <span class="toggle-track"></span>
+    </label>
+  </div>
+
+  <!-- Trails toggle also shows/hides gate labels for hikers -->
+  <div class="layer-row">
+    <span class="layer-swatch" style="background:#8b5e3c;"></span>
+    <label for="tog-trails">Trails &amp; Roads</label>
+    <label class="toggle">
+      <input type="checkbox" id="tog-trails" checked/>
+      <span class="toggle-track"></span>
+    </label>
+  </div>
+
+  <div class="layer-row">
+    <span class="layer-swatch" style="background:#1e6b3a; border-radius:50%;"></span>
+    <label for="tog-gates">Gates</label>
+    <label class="toggle">
+      <input type="checkbox" id="tog-gates" checked/>
+      <span class="toggle-track"></span>
+    </label>
+  </div>
+
+  <div class="layer-row">
+    <span class="layer-swatch" style="background:#c4780a; border-radius:50%;"></span>
+    <label for="tog-photos">Historic Photos</label>
+    <label class="toggle">
+      <input type="checkbox" id="tog-photos" checked/>
+      <span class="toggle-track"></span>
+    </label>
+  </div>
+
+  <div class="layer-row">
+    <span class="layer-swatch" style="background:#c0392b; border-radius:50%;"></span>
+    <label for="tog-gauges">USGS Gauges</label>
+    <label class="toggle">
+      <input type="checkbox" id="tog-gauges" checked/>
+      <span class="toggle-track"></span>
+    </label>
+  </div>
+</div>
+
+<div id="sidebar">
+
+<!-- Title -->
+<div class="panel" id="panel-title">
+  <p class="map-title">Wachusett Reservoir</p>
+  <p class="map-subtitle">Watershed &amp; Water Quality Explorer</p>
+  <p class="map-credit">
+    Boundaries &amp; bathymetry: MassGIS / DCR-DWSP<br>
+    Gauges: USGS NWIS (real-time) &middot; Photos: Digital Commonwealth
+  </p>
+</div>
+
+<!-- Gate search panel -->
+<div class="panel" id="panel-gate-search">
+  <p class="panel-heading">Find a Gate</p>
+  <div class="search-input-row">
+    <input type="text" id="gate-search-input" placeholder="e.g. 22, WB15, S8" autocomplete="off"/>
+    <button id="gate-search-btn">Go</button>
+  </div>
+  <select id="gate-select">
+    <option value="">&#9660; pick from list</option>
+  </select>
+  <div id="gate-search-msg"></div>
+  <p class="gate-hint">
+    Plain numbers (6-39) = Clinton/Sterling<br>
+    WB = West Boylston &nbsp;&middot;&nbsp; S = Sterling<br>
+    H = Holden &nbsp;&middot;&nbsp; B = Boylston
+  </p>
+</div>
+
+<!-- USGS live gauges -->
+<div class="panel" id="panel-gauges">
+  <p class="panel-heading">Live Stream Gauges</p>
+  <div id="gauge-content">
+    <p class="gauge-msg">Loading...</p>
+  </div>
+</div>
+
+</div><!-- /sidebar -->
+
+<!-- Bathymetry depth legend -->
+<div class="panel" id="panel-legend">
+  <p class="panel-heading">Depth (ft)</p>
+  <div class="legend-ramp"></div>
+  <div class="legend-ends">
+    <span>0</span>
+    <span>120</span>
+  </div>
+</div>
+
+<!-- Historical photo modal -->
+<div id="photo-modal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <p class="modal-title" id="modal-title"></p>
+      <button class="modal-close" id="modal-close" aria-label="Close">&#x2715;</button>
+    </div>
+    <img class="modal-img" id="modal-img" src="" alt="Historical photograph"/>
+    <p class="modal-date" id="modal-date"></p>
+    <p class="modal-desc" id="modal-desc"></p>
+    <a class="modal-link" id="modal-link" href="#" target="_blank" rel="noopener">
+      View on Digital Commonwealth &rarr;
+    </a>
+  </div>
+</div>
+
+<script>
+// ── Configuration — all project-level constants live here ─────────────────────
+// MapLibre coordinates are always [longitude, latitude]
+const MAP_CENTER = [-71.75, 42.38];   // user-specified center: West Boylston arm
+const MAP_ZOOM   = 12;
+const BASEMAP    = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
+
+// GeoJSON files produced by fetch_data.py
+const DATA_FILES = {
+  watershed:    "data/watershed.geojson",
+  bathymetry:   "data/bathymetry.geojson",
+  trails:       "data/trails.geojson",
+  fishingGates: "data/fishing_gates.geojson",
+  photos:       "data/historical_photos.geojson",
+};
+
+// USGS NWIS instantaneous values — verify site IDs at https://waterdata.usgs.gov/ma/nwis/rt
+// 01095220: Stillwater River at Sterling, MA
+// 01095434: Quinapoxet River near Holden, MA
+const USGS_SITES  = "01095220,01095434";
+const USGS_PARAMS = "00060,00065";   // 00060 = discharge (cfs), 00065 = gage height (ft)
+
+// Layer colours — adjust here to retheme without touching layer definitions
+const COLOURS = {
+  watershed:    "#1a4f7a",
+  bathyShallow: "#deeef8",   // near-white blue for 0 ft
+  bathyMid:     "#4292c6",   // mid blue for ~60 ft
+  bathyDeep:    "#08306b",   // navy for 120 ft
+  trail:        "#8b5e3c",
+  fishingGate:  "#1e6b3a",
+  photo:        "#c4780a",
+  gauge:        "#c0392b",
+};
+
+// Bathymetry: field confirmed from MassGIS layer schema (10-ft contour bands).
+// MaxDisplayContour = the deep edge of each contour band (e.g. 20 for the 10-20 ft band).
+const BATHY_DEPTH_FIELD = "MaxDisplayContour";
+const BATHY_MAX_DEPTH   = 120;   // Wachusett Reservoir maximum recorded depth in feet
+
+// ── Map initialisation ────────────────────────────────────────────────────────
+const map = new maplibregl.Map({
+  container: "map",
+  style:     BASEMAP,
+  center:    MAP_CENTER,   // [longitude, latitude]
+  zoom:      MAP_ZOOM,
+});
+
+map.addControl(new maplibregl.NavigationControl(),            "bottom-right");
+map.addControl(new maplibregl.ScaleControl({ unit: "imperial" }), "bottom-right");
+
+// Module-level reference so gateSearch() can access loaded gate features
+let gateFeatures = [];
+
+// ── Load all static GeoJSON layers, then fetch live gauge data ────────────────
+map.on("load", async () => {
+  try {
+    const [watershed, bathymetry, trails, fishingGates, photos] = await Promise.all(
+      Object.values(DATA_FILES).map(url =>
+        fetch(url).then(r => {
+          if (!r.ok) throw new Error(`${url}: HTTP ${r.status}`);
+          return r.json();
+        })
+      )
+    );
+
+    gateFeatures = fishingGates.features;   // store for search
+    populateGateDropdown(gateFeatures);
+    addWatershedLayer(watershed);
+    addBathymetryLayer(bathymetry);
+    addTrailsLayer(trails);
+    addFishingGatesLayer(fishingGates);
+    addPhotosLayer(photos);
+  } catch (err) {
+    console.error("GeoJSON load error:", err);
+    console.info("Tip: open via HTTP server, not file:// — run: python -m http.server 8000");
+  }
+
+  fetchUsgsGauges();
+  hideLoading();
+});
+
+// ── Watershed boundary ────────────────────────────────────────────────────────
+function addWatershedLayer(data) {
+  map.addSource("watershed", { type: "geojson", data });
+
+  map.addLayer({
+    id: "watershed-fill",
+    type: "fill",
+    source: "watershed",
+    paint: { "fill-color": COLOURS.watershed, "fill-opacity": 0.05 },
+  });
+
+  map.addLayer({
+    id: "watershed-outline",
+    type: "line",
+    source: "watershed",
+    paint: {
+      "line-color":     COLOURS.watershed,
+      "line-width":     2,
+      "line-dasharray": [5, 3],
+    },
+  });
+}
+
+// ── Bathymetry ────────────────────────────────────────────────────────────────
+// Depth field: MaxDisplayContour (deep edge of each 10-ft band, 10–120).
+// Shallow polygons have low values; deepest polygon has value 120.
+function addBathymetryLayer(data) {
+  map.addSource("bathymetry", { type: "geojson", data });
+
+  map.addLayer({
+    id: "bathymetry-fill",
+    type: "fill",
+    source: "bathymetry",
+    paint: {
+      "fill-color": [
+        "interpolate", ["linear"],
+        ["get", BATHY_DEPTH_FIELD],
+        0,                     COLOURS.bathyShallow,
+        BATHY_MAX_DEPTH / 2,   COLOURS.bathyMid,
+        BATHY_MAX_DEPTH,       COLOURS.bathyDeep,
+      ],
+      "fill-opacity": 0.78,
+    },
+  });
+
+  // Thin contour lines between depth bands
+  map.addLayer({
+    id: "bathymetry-outline",
+    type: "line",
+    source: "bathymetry",
+    paint: { "line-color": "#4a90c4", "line-width": 0.5, "line-opacity": 0.35 },
+  });
+
+  map.on("click", "bathymetry-fill", e => {
+    const p = e.features[0].properties;
+    new maplibregl.Popup()
+      .setLngLat(e.lngLat)   // click position [lng, lat]
+      .setHTML(`<strong>Depth band:</strong> ${p.DepthRange || p[BATHY_DEPTH_FIELD] + " ft"}`)
+      .addTo(map);
+  });
+  setCursor("bathymetry-fill");
+}
+
+// ── Trails and roads ──────────────────────────────────────────────────────────
+// Trails toggle also controls gate labels so hikers see gate numbers
+// whenever they turn on the trail layer for navigation.
+function addTrailsLayer(data) {
+  map.addSource("trails", { type: "geojson", data });
+
+  map.addLayer({
+    id: "trails-line",
+    type: "line",
+    source: "trails",
+    paint: {
+      "line-color":   COLOURS.trail,
+      "line-width":   ["interpolate", ["linear"], ["zoom"], 10, 1.5, 15, 3],
+      "line-opacity": 0.85,
+    },
+  });
+
+  map.on("click", "trails-line", e => {
+    const p = e.features[0].properties;
+    const name    = p.NAME || "Trail / Road";
+    const surface = p.SURFACE ? `<br>Surface: ${p.SURFACE}` : "";
+    const type    = p.TYPE    ? `<br>${p.TYPE}`              : "";
+    new maplibregl.Popup()
+      .setLngLat(e.lngLat)
+      .setHTML(`<strong>${name}</strong>${type}${surface}`)
+      .addTo(map);
+  });
+  setCursor("trails-line");
+}
+
+// ── Fishing / access gates ────────────────────────────────────────────────────
+function addFishingGatesLayer(data) {
+  map.addSource("fishing-gates", { type: "geojson", data });
+
+  // Dot layer — colour-coded by watershed prefix for quick visual grouping
+  map.addLayer({
+    id: "fishing-gates-circle",
+    type: "circle",
+    source: "fishing-gates",
+    paint: {
+      "circle-radius":       6,
+      "circle-color":        COLOURS.fishingGate,
+      "circle-stroke-color": "#ffffff",
+      "circle-stroke-width": 1.5,
+    },
+  });
+
+  // Gate number label — offset above the dot; halo ensures legibility on any tile
+  map.addLayer({
+    id: "gates-label",
+    type: "symbol",
+    source: "fishing-gates",
+    layout: {
+      "text-field":            ["concat", "Gate ", ["get", "Gate_Number"]],
+      "text-font":             ["Open Sans Bold", "Arial Unicode MS Bold"],
+      "text-size":             ["interpolate", ["linear"], ["zoom"], 11, 10, 14, 13],
+      "text-offset":           [0, -1.3],      // above the circle
+      "text-anchor":           "bottom",
+      "text-allow-overlap":    false,
+      "text-ignore-placement": false,
+    },
+    paint: {
+      "text-color":       "#1e6b3a",
+      "text-halo-color":  "rgba(255,255,255,0.9)",
+      "text-halo-width":  1.5,
+    },
+  });
+
+  map.on("click", "fishing-gates-circle", e => {
+    const p   = e.features[0].properties;
+    const lng = e.features[0].geometry.coordinates[0];  // GeoJSON Point: [lng, lat]
+    const lat = e.features[0].geometry.coordinates[1];
+    new maplibregl.Popup({ maxWidth: "280px" })
+      .setLngLat([lng, lat])
+      .setHTML(buildGatePopup(p))
+      .addTo(map);
+  });
+  setCursor("fishing-gates-circle");
+}
+
+function buildGatePopup(p) {
+  const gateNum = p.Gate_Number || "?";
+  const town    = p.Gate_Town   || "";
+  const ada     = p.ADA_Length === "Yes" ? "ADA accessible" : "Standard access";
+  const cond    = p.Gate_Condition || "";
+  const signs   = (p.Current_Signage || "").split(",");
+
+  const badgeMap = {
+    "Public_Access_Sign":        ["allow", "Public Access"],
+    "No_Fishing_Allowed":        ["deny",  "No Fishing"],
+    "No_Dogs_Allowed":           ["deny",  "No Dogs"],
+    "No_DogBikeSwimWadeBoat":    ["deny",  "No Dogs / Bikes / Swimming"],
+    "No_Drones_Allowed":         ["deny",  "No Drones"],
+    "No_Parking_Tow_Zone":       ["info",  "No Parking"],
+    "Do_Not_Feed_Wildlife":      ["info",  "Don't Feed Wildlife"],
+  };
+
+  const badges = signs
+    .map(s => {
+      const b = badgeMap[s.trim()];
+      return b ? `<span class="gate-badge ${b[0]}">${b[1]}</span>` : "";
+    })
+    .filter(Boolean)
+    .join("");
+
+  return `
+    <div class="gate-popup-content">
+      <p class="gate-popup-title">Gate ${gateNum}</p>
+      ${town ? `<p class="gate-popup-town">${town}</p>` : ""}
+      ${badges ? `<div class="gate-popup-badges">${badges}</div>` : ""}
+      <div class="gate-popup-detail">
+        ${ada}<br>
+        ${cond ? `Condition: ${cond}` : ""}
+      </div>
+    </div>`;
+}
+
+// ── Historical photo markers ───────────────────────────────────────────────────
+function addPhotosLayer(data) {
+  map.addSource("photos", { type: "geojson", data });
+
+  map.addLayer({
+    id: "photos-circle",
+    type: "circle",
+    source: "photos",
+    paint: {
+      "circle-radius":       7,
+      "circle-color":        COLOURS.photo,
+      "circle-stroke-color": "#ffffff",
+      "circle-stroke-width": 1.5,
+    },
+  });
+
+  map.on("click", "photos-circle", e => {
+    openPhotoModal(e.features[0].properties);
+  });
+  setCursor("photos-circle");
+}
+
+// ── USGS real-time gauge data ─────────────────────────────────────────────────
+async function fetchUsgsGauges() {
+  const url = [
+    "https://waterservices.usgs.gov/nwis/iv/",
+    `?sites=${USGS_SITES}`,
+    `&parameterCd=${USGS_PARAMS}`,
+    "&format=json&siteStatus=active",
+  ].join("");
+
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`USGS API: HTTP ${r.status}`);
+    const json = await r.json();
+
+    const sites = {};
+    for (const ts of json.value.timeSeries) {
+      const siteNo = ts.sourceInfo.siteCode[0].value;
+      const lat    = parseFloat(ts.sourceInfo.geoLocation.geogLocation.latitude);
+      const lng    = parseFloat(ts.sourceInfo.geoLocation.geogLocation.longitude);
+      const latest = ts.values[0]?.value?.at(-1);
+
+      if (!sites[siteNo]) {
+        sites[siteNo] = { name: ts.sourceInfo.siteName, lat, lng, readings: [] };
+      }
+      sites[siteNo].readings.push({
+        param:    ts.variable.variableDescription,
+        value:    latest?.value,
+        unit:     ts.variable.unit.unitCode,
+        dateTime: latest?.dateTime,
+      });
+    }
+
+    renderGaugePanel(sites);
+    addGaugeMarkers(sites);
+  } catch (err) {
+    document.getElementById("gauge-content").innerHTML =
+      `<p class="gauge-msg">Could not load gauge data</p>`;
+    console.error("USGS fetch failed:", err);
+  }
+}
+
+function renderGaugePanel(sites) {
+  document.getElementById("gauge-content").innerHTML = Object.values(sites)
+    .map(site => `
+      <div class="gauge-site">
+        <p class="gauge-name">${site.name}</p>
+        ${site.readings.map(r => `<p class="gauge-value">${formatReading(r)}</p>`).join("")}
+        <p class="gauge-time">${formatDateTime(site.readings[0]?.dateTime)}</p>
+      </div>
+    `).join("");
+}
+
+function addGaugeMarkers(sites) {
+  const features = Object.values(sites).map(site => ({
+    type: "Feature",
+    geometry: {
+      type:        "Point",
+      coordinates: [site.lng, site.lat],   // GeoJSON: [longitude, latitude]
+    },
+    properties: {
+      name:     site.name,
+      readings: JSON.stringify(site.readings),
+    },
+  }));
+
+  map.addSource("gauges", {
+    type: "geojson",
+    data: { type: "FeatureCollection", features },
+  });
+
+  map.addLayer({
+    id: "gauges-circle",
+    type: "circle",
+    source: "gauges",
+    paint: {
+      "circle-radius":       9,
+      "circle-color":        COLOURS.gauge,
+      "circle-stroke-color": "#ffffff",
+      "circle-stroke-width": 2,
+    },
+  });
+
+  map.on("click", "gauges-circle", e => {
+    const p        = e.features[0].properties;
+    const readings = JSON.parse(p.readings);
+    new maplibregl.Popup()
+      .setLngLat(e.features[0].geometry.coordinates)   // Point: [lng, lat]
+      .setHTML(`
+        <strong>${p.name}</strong><br>
+        ${readings.map(r => formatReading(r)).join("<br>")}
+      `)
+      .addTo(map);
+  });
+  setCursor("gauges-circle");
+}
+
+// ── Layer visibility toggles ──────────────────────────────────────────────────
+// Trails toggle deliberately also controls gate labels: hikers turning on trails
+// want to see gate numbers for navigation without a separate toggle.
+const TOGGLE_MAP = {
+  "tog-watershed":  ["watershed-fill",     "watershed-outline"],
+  "tog-bathymetry": ["bathymetry-fill",    "bathymetry-outline"],
+  "tog-trails":     ["trails-line",        "gates-label"],   // gate labels follow trails
+  "tog-gates":      ["fishing-gates-circle", "gates-label"],
+  "tog-photos":     ["photos-circle"],
+  "tog-gauges":     ["gauges-circle"],
+};
+
+Object.entries(TOGGLE_MAP).forEach(([inputId, layerIds]) => {
+  document.getElementById(inputId).addEventListener("change", function () {
+    const vis = this.checked ? "visible" : "none";
+    layerIds.forEach(id => {
+      // Guard: gauge layer is added asynchronously after USGS data resolves;
+      // gates-label only exists after GeoJSON load.
+      if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", vis);
+    });
+  });
+});
+
+// ── Gate search ───────────────────────────────────────────────────────────────
+function gateSearch() {
+  const raw     = document.getElementById("gate-search-input").value.trim();
+  const query   = raw.toLowerCase().replace(/^gate\s*/i, "");  // strip leading "gate"
+  const msgEl   = document.getElementById("gate-search-msg");
+
+  if (!query) { msgEl.textContent = ""; return; }
+  if (!gateFeatures.length) { msgEl.textContent = "Data still loading..."; return; }
+
+  // Exact match first, then partial prefix match
+  const exact = gateFeatures.find(
+    f => (f.properties.Gate_Number || "").toLowerCase() === query
+  );
+  const match = exact || gateFeatures.find(
+    f => (f.properties.Gate_Number || "").toLowerCase().startsWith(query)
+  );
+
+  if (!match) {
+    msgEl.textContent = `No gate matching "${raw}"`;
+    return;
+  }
+
+  const p   = match.properties;
+  const lng = match.geometry.coordinates[0];  // GeoJSON Point: [longitude, latitude]
+  const lat = match.geometry.coordinates[1];
+
+  map.flyTo({ center: [lng, lat], zoom: 15, duration: 900 });
+  msgEl.textContent = `Gate ${p.Gate_Number} - ${p.Gate_Town || ""}`;
+
+  // Open a popup at the gate
+  new maplibregl.Popup({ maxWidth: "280px" })
+    .setLngLat([lng, lat])
+    .setHTML(buildGatePopup(p))
+    .addTo(map);
+}
+
+document.getElementById("gate-search-btn").addEventListener("click", gateSearch);
+document.getElementById("gate-search-input").addEventListener("keydown", e => {
+  if (e.key === "Enter") gateSearch();
+});
+
+document.getElementById("gate-select").addEventListener("change", function () {
+  if (!this.value) return;
+  document.getElementById("gate-search-input").value = this.value;
+  gateSearch();
+  this.value = "";   // reset so the same gate can be re-selected
+});
+
+function populateGateDropdown(features) {
+  const sel = document.getElementById("gate-select");
+
+  // Sort: plain numeric gates first (by number), then prefixed gates alphabetically
+  const sorted = [...features].sort((a, b) => {
+    const na = a.properties.Gate_Number || "";
+    const nb = b.properties.Gate_Number || "";
+    const numA = parseFloat(na);
+    const numB = parseFloat(nb);
+    const aNum = !isNaN(numA) && /^\d/.test(na);
+    const bNum = !isNaN(numB) && /^\d/.test(nb);
+    if (aNum && bNum) return numA - numB;
+    if (aNum) return -1;
+    if (bNum) return 1;
+    return na.localeCompare(nb, undefined, { numeric: true });
+  });
+
+  sorted.forEach(f => {
+    const p   = f.properties;
+    const opt = document.createElement("option");
+    opt.value       = p.Gate_Number;
+    opt.textContent = `Gate ${p.Gate_Number}${p.Gate_Town ? "  —  " + p.Gate_Town : ""}`;
+    sel.appendChild(opt);
+  });
+}
+
+// ── Photo modal ───────────────────────────────────────────────────────────────
+function openPhotoModal(props) {
+  const img = document.getElementById("modal-img");
+  if (props.thumb) {
+    img.src           = props.thumb;
+    img.style.display = "block";
+  } else {
+    img.style.display = "none";
+  }
+  document.getElementById("modal-title").textContent = props.title    || "Untitled";
+  document.getElementById("modal-date").textContent  = props.date     || "";
+  document.getElementById("modal-desc").textContent  = props.desc     || "";
+  document.getElementById("modal-link").href         = props.item_url || "#";
+  document.getElementById("photo-modal").classList.add("open");
+}
+
+document.getElementById("modal-close").addEventListener("click", closeModal);
+document.getElementById("photo-modal").addEventListener("click", e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+function closeModal() {
+  document.getElementById("photo-modal").classList.remove("open");
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function setCursor(layerId) {
+  map.on("mouseenter", layerId, () => map.getCanvas().style.cursor = "pointer");
+  map.on("mouseleave", layerId, () => map.getCanvas().style.cursor = "");
+}
+
+function formatReading(r) {
+  if (!r.value || r.value === "-999999") return "No data";
+  const val = parseFloat(r.value).toFixed(2);
+  if (r.param.includes("Discharge")) return `Discharge: ${val} cfs`;
+  if (r.param.includes("Gage"))      return `Stage: ${val} ft`;
+  return `${val} ${r.unit}`;
+}
+
+function formatDateTime(iso) {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleString("en-US", {
+      month: "short", day: "numeric",
+      hour: "numeric", minute: "2-digit",
+      timeZoneName: "short",
+    });
+  } catch { return iso; }
+}
+
+function hideLoading() {
+  const el = document.getElementById("loading");
+  el.style.opacity = "0";
+  setTimeout(() => el.remove(), 400);
+}
+</script>
+</body>
+</html>
