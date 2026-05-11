@@ -1,0 +1,167 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.79,
+          42.378
+        ]
+      },
+      "properties": {
+        "title": "Old Stone Church (Congregational Society), from the northwest",
+        "date": "1898-10-17",
+        "desc": "Church building at corner of Central & Worcester Sts, West Boylston; documented by Water Board photographer Charles W. Tarr before demolition. Now submerged under the reservoir.",
+        "thumb": "https://bpldcassets.blob.core.windows.net/derivatives/images/commonwealth:qb98mw62x/image_thumbnail_300.jpg",
+        "item_url": "https://www.digitalcommonwealth.org/search/commonwealth:qb98mw61n",
+        "coord_note": "Approx. corner of Central & Worcester Sts per photo title; area now beneath reservoir surface"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.79,
+          42.378
+        ]
+      },
+      "properties": {
+        "title": "Old Stone Church (Congregational Society), from the southeast",
+        "date": "1898-10-17",
+        "desc": "Opposite view of the same stone church building; second of two angles photographed on the same day for the Metropolitan Water Board real-estate survey.",
+        "thumb": "https://bpldcassets.blob.core.windows.net/derivatives/images/commonwealth:qb98mw60c/image_thumbnail_300.jpg",
+        "item_url": "https://www.digitalcommonwealth.org/search/commonwealth:qb98mw59m",
+        "coord_note": "Approx. corner of Central & Worcester Sts per photo title"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.786,
+          42.376
+        ]
+      },
+      "properties": {
+        "title": "First Baptist Church, West Boylston",
+        "date": "1897-10-16",
+        "desc": "Baptist church in old West Boylston town center, photographed as part of the Metropolitan Water Board property survey. Now submerged.",
+        "thumb": "https://bpldcassets.blob.core.windows.net/derivatives/images/commonwealth:pg15bn01c/image_thumbnail_300.jpg",
+        "item_url": "https://www.digitalcommonwealth.org/search/commonwealth:pg15bn003",
+        "coord_note": "Old West Boylston town area; DC gives town-level centroid only"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.788,
+          42.374
+        ]
+      },
+      "properties": {
+        "title": "Catholic Church, West Boylston",
+        "date": "1898-05-20",
+        "desc": "Catholic church building in old West Boylston, part of the reservoir real-estate acquisition survey.",
+        "thumb": "https://bpldcassets.blob.core.windows.net/derivatives/images/commonwealth:pg15bn470/image_thumbnail_300.jpg",
+        "item_url": "https://www.digitalcommonwealth.org/search/commonwealth:pg15bn46q",
+        "coord_note": "Old West Boylston town area; DC gives town-level centroid only"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.714,
+          42.423
+        ]
+      },
+      "properties": {
+        "title": "Wachusett Dam \u2014 first stone laid",
+        "date": "1901-06-05",
+        "desc": "Construction milestone: first masonry stone placed at the dam site. Photographed by George P. Goodman for the Metropolitan Water and Sewerage Board.",
+        "thumb": "https://bpldcassets.blob.core.windows.net/derivatives/images/commonwealth:ft848x08n/image_thumbnail_300.jpg",
+        "item_url": "https://www.digitalcommonwealth.org/search/commonwealth:ft848x07c",
+        "coord_note": "Wachusett Dam; coordinates from USGS NHD dam feature"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.703,
+          42.418
+        ]
+      },
+      "properties": {
+        "title": "Construction railroad cut near Sandy Pond, from the north",
+        "date": "1898-06-16",
+        "desc": "Railroad grading cut used to haul dam construction materials; photographed near Sandy Pond in Clinton, east of the reservoir basin.",
+        "thumb": "https://bpldcassets.blob.core.windows.net/derivatives/images/commonwealth:ht24x611b/image_thumbnail_300.jpg",
+        "item_url": "https://www.digitalcommonwealth.org/search/commonwealth:ht24x6102",
+        "coord_note": "Approx. Sandy Pond area per photo title; Clinton MA"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.712,
+          42.441
+        ]
+      },
+      "properties": {
+        "title": "North Dike construction",
+        "date": "1899-01-01",
+        "desc": "Earthwork construction of the North Dike, which closes the northern gap in the reservoir rim between Clinton and Sterling.",
+        "thumb": "https://bpldcassets.blob.core.windows.net/derivatives/images/commonwealth:5m60r5944/image_thumbnail_300.jpg",
+        "item_url": "https://www.digitalcommonwealth.org/search/commonwealth:5m60r593v",
+        "coord_note": "North Dike crest; approximate from reservoir geometry"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.78,
+          42.381
+        ]
+      },
+      "properties": {
+        "title": "Building the West Boylston Arch",
+        "date": "1904-09-18",
+        "desc": "Stone arch under construction over the Quinapoxet River where it enters the reservoir; photographed by Charles W. Tarr.",
+        "thumb": "https://bpldcassets.blob.core.windows.net/derivatives/images/commonwealth:9p2909884/image_thumbnail_300.jpg",
+        "item_url": "https://www.digitalcommonwealth.org/search/commonwealth:9p290987v",
+        "coord_note": "Quinapoxet River arch, West Boylston; approx. from reservoir shoreline"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -71.78,
+          42.381
+        ]
+      },
+      "properties": {
+        "title": "West Boylston Arch, completed",
+        "date": "1904-12-02",
+        "desc": "Completed stone arch carrying the former road over the Quinapoxet River at the reservoir inlet \u2014 still partially visible above waterline today.",
+        "thumb": "https://bpldcassets.blob.core.windows.net/derivatives/images/commonwealth:z316q390h/image_thumbnail_300.jpg",
+        "item_url": "https://www.digitalcommonwealth.org/search/commonwealth:z316q389r",
+        "coord_note": "Quinapoxet River arch, West Boylston"
+      }
+    }
+  ]
+}
