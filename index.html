@@ -181,8 +181,8 @@
       padding-top: 8px;
     }
 
-    /* ── Bathymetry legend (bottom-left) ──────────────────────────────────── */
-    #panel-legend { bottom: 40px; left: 20px; min-width: 175px; }
+    /* ── Bathymetry legend — now stacked as the last sidebar card ──────────── */
+    #panel-legend { min-width: 175px; }
     .legend-ramp {
       height: 10px; border-radius: 3px;
       background: linear-gradient(to right, #deeef8, #4292c6, #08306b);
@@ -463,8 +463,6 @@
   </div>
 </div>
 
-</div><!-- /sidebar -->
-
 <!-- Bathymetry depth legend -->
 <div class="panel" id="panel-legend">
   <p class="panel-heading">Depth (ft)</p>
@@ -474,6 +472,8 @@
     <span>120</span>
   </div>
 </div>
+
+</div><!-- /sidebar -->
 
 <!-- Historical photo modal -->
 <div id="photo-modal">
